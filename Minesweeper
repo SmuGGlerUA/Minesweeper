@@ -1,0 +1,193 @@
+import kotlin.random.Random
+import kotlin.system.exitProcess
+
+public val fieldPlay: MutableList<MutableList<String>> = MutableList(12) { MutableList(12) { "." } }
+public val fieldOpen: MutableList<MutableList<String>> = MutableList(12) { MutableList(12) { "." } }
+public var countMines: Int = 0
+
+fun fieldBorder(field: MutableList<MutableList<String>>) {
+    val one = mutableListOf(" ","│","1","2","3","4","5","6","7","8","9","│")
+    val two = mutableListOf("—","│","—","—","—","—","—","—","—","—","—","│")
+    field[0].clear()
+    field[1].clear()
+    field[11].clear()
+    field[0].addAll(one)
+    field[1].addAll(two)
+    field[11].addAll(two)
+    var number = 1
+    for (n in 2..10) {
+        field[n][1] = "│"
+        field[n][11] = "│"
+        field[n][0] = number.toString()
+        number++
+    }
+}
+
+fun addMines() {
+    repeat(countMines) {
+        var x = Random.nextInt(2, 11)
+        var y = Random.nextInt(2, 11)
+        while (fieldOpen[x][y] == "*" || fieldOpen[x][y] == "/") {
+            x = Random.nextInt(2, 11)
+            y = Random.nextInt(2, 11)
+        }
+        fieldOpen[x][y] = "*"
+    }
+}
+
+fun hint() {
+    for (m in 2..10) {
+        for (n in 2..10) {
+            var z = 0
+            for (i in -1..1) {
+                for (j in -1..1) {
+                    if (i == 0 && j == 0) continue
+                    if (m + i in 2..10 && n + j in 2..10 && fieldOpen[m + i][n + j] == "*") z++
+                }
+            }
+            if (z > 0 && fieldOpen[m][n] != "*") {
+                if (fieldOpen[m][n] == ".") {
+                    fieldOpen[m][n] = z.toString()
+                } else {
+                    fieldOpen[m][n] = (fieldOpen[m][n].toInt() + z).toString()
+                }
+            }
+
+        }
+    }
+}
+
+fun showMines() {
+    for (o in 2..10) {
+        for (r in 2..10) {
+            if (fieldOpen[o][r] == "*") fieldPlay[o][r] = "X"
+        }
+    }
+    println(fieldPlay.joinToString("\n") { it.joinToString("") })
+    println("You stepped on a mine and failed!")
+    exitProcess(0)
+}
+
+fun openFree(x: Int, y: Int) {
+    for (c in -1..1) {
+        for (v in -1..1) {
+            if (c == 0 && v == 0) continue
+            if (x + c in 2..10 && y + v in 2..10 && fieldOpen[x + c][y + v] != "*") when (fieldOpen[x + c][y + v]) {
+                "." -> {
+                    fieldPlay[x + c][y + v] = "/"
+                    fieldOpen[x + c][y + v] = "/"
+                    openFree((x + c), (y + v))
+                }
+                "/" -> continue
+                else -> fieldPlay[x+c][y+v] = fieldOpen[x+c][y+v]
+            }
+        }
+    }
+}
+
+fun firstStep() {
+    println(fieldPlay.joinToString("\n") { it.joinToString("") })
+    println("Set/unset mine marks or claim a cell as free:")
+    val input = readln().split(" ")
+    if (input.size == 3) {
+        val x = input[1].toInt() + 1
+        val y = input[0].toInt() + 1
+        val action = input[2].toString()
+        when (action) {
+            "mine" -> {
+                if (fieldPlay[x][y] != "*") fieldPlay[x][y] = "*" else fieldPlay[x][y] = "."
+                println(fieldPlay.joinToString("\n") { it.joinToString("") })
+                firstStep()
+            } else -> {
+                    for (c in -1..1) {
+                        for (v in -1..1) {
+                            if (x + c in 2..10 && y + v in 2..10) {
+                                fieldPlay[x + c][y + v] = "/"
+                                fieldOpen[x + c][y + v] = "/"
+                            }
+                        }
+                    }
+            addMines()
+            for (c in -1..1) {
+                for (v in -1..1) {
+                    if (c == 0 && v == 0) continue
+                    if (fieldPlay[x + c][y + v] == "/") {
+                        fieldPlay[x + c][y + v] = "."
+                        fieldOpen[x + c][y + v] = "."
+                    }
+                }
+            }
+            hint()
+            openFree(x, y)
+            auditMine()
+            }
+        }
+    }
+}
+
+fun play() {
+    println(fieldPlay.joinToString("\n") { it.joinToString("") })
+    println("Set/unset mine marks or claim a cell as free:")
+    val input = readln().split(" ")
+    if (input.size == 3) {
+        val x = input[1].toInt() + 1
+        val y = input[0].toInt() + 1
+        val action = input[2].toString()
+        when (action) {
+            "mine" -> {
+                if (fieldPlay[x][y] != "*") {
+                    fieldPlay[x][y] = "*"
+                    if (fieldOpen[x][y] == "*") {
+                        auditMine()
+                    } else {
+                        play()
+                    }
+                } else {
+                    fieldPlay[x][y] = "."
+                }
+            }
+            "free" -> {
+                if (fieldOpen[x][y] != "*") {
+                    if (fieldOpen[x][y] == ".") {
+                        fieldPlay[x][y] = "/"
+                        openFree(x, y)
+                        auditMine()
+                    } else {
+                        fieldPlay[x][y] = fieldOpen[x][y]
+                        auditMine()
+                    }
+                } else {
+                    showMines()
+                }
+            }
+        }
+    }
+}
+
+fun auditMine() {
+    var mine = 0
+    var empty = 0
+    for (q in 2..10) {
+        for (w in 2..10) {
+            when (fieldPlay[q][w]) {
+                "*" -> if (fieldOpen[q][w] != "*") play() else mine++
+                "." -> if (fieldOpen[q][w] == "*") play() else empty++
+                else -> continue
+            }
+        }
+    }
+    if (mine == countMines || mine + empty == countMines) {
+        println(fieldPlay.joinToString("\n") { it.joinToString("") })
+        println("Congratulations! You found all the mines!")
+    } else {
+        play()
+    }
+}
+
+fun main() {
+    fieldBorder(fieldPlay)
+    fieldBorder(fieldOpen)
+    println("How many mines do you want on the field?")
+    countMines = readln().toInt()
+    firstStep()
+}
